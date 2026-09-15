@@ -1,0 +1,24 @@
+/* 공개 사이트(HanRightThat_30)와 색/폰트 톤을 맞추기 위한 값. 파일은 공유하지 않고 값만 맞춘다. */
+:root {
+  --void: #0b0a12;
+  --deck: #14121f;
+  --deck2: #1c1930;
+  --wire: #2e2947;
+  --bone: #f2efe6;
+  --dim: #8f87a8;
+  --acid: #d4ff3f;
+  --hot: #ff1f6d;
+  --cyan: #00e5ff;
+  --violet: #9d4edd;
+
+  --rank-gold: #d9b65d;
+  --rank-silver: #bfc3cc;
+  --rank-bronze: #b7794b;
+  --rank-default: #5b5670;
+
+  --font-display: 'Black Han Sans', 'Gothic A1', system-ui, sans-serif;
+  --font-body: 'Gothic A1', system-ui, sans-serif;
+
+  --sidebar-width: 220px;
+  --topbar-height: 56px;
+}
