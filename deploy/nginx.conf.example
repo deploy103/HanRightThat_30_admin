@@ -1,0 +1,33 @@
+# admin.hanwol.site -> HanRightThat_30_admin 컨테이너(127.0.0.1:3100) 리버스 프록시 예시.
+# 실제 서버 경로/인증서 경로는 환경에 맞게 조정한다.
+
+server {
+    listen 80;
+    server_name admin.hanwol.site;
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name admin.hanwol.site;
+
+    ssl_certificate     /etc/letsencrypt/live/admin.hanwol.site/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/admin.hanwol.site/privkey.pem;
+
+    # 검색엔진 노출 방지 (index.html 의 robots 메타와 별개로 한 번 더 막는다)
+    add_header X-Robots-Tag "noindex, nofollow" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:3100;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

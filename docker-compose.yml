@@ -1,0 +1,10 @@
+services:
+  admin:
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://hanwol.site}
+    ports:
+      # reverse proxy(nginx)만 접근하도록 loopback 에만 바인딩한다.
+      - "127.0.0.1:3100:80"
+    restart: unless-stopped
