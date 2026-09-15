@@ -82,9 +82,16 @@ docker compose up -d --build
 ```
 
 - `Dockerfile` 은 멀티스테이지: `node:20-alpine` 으로 빌드 → `nginx:alpine` 으로 정적 파일만 서빙.
-- 컨테이너는 `127.0.0.1:3100` 에만 바인딩된다 — 외부에서는 반드시 리버스 프록시를 통해 접근한다.
-- `nginx.conf` 는 컨테이너 **내부** nginx 설정(SPA fallback 용)이고, [`deploy/nginx.conf.example`](./deploy/nginx.conf.example) 은
-  호스트의 리버스 프록시(`admin.hanwol.site` → `127.0.0.1:3100`) 설정 예시다. 서로 다른 파일이니 혼동하지 말 것.
+- 컨테이너는 기본적으로 `127.0.0.1:3100` 에만 바인딩된다 — 외부에서는 반드시 리버스 프록시를 통해 접근한다.
+- `nginx.conf` 는 컨테이너 **내부** nginx 설정(SPA fallback + 보안 헤더용)이고, [`deploy/nginx.conf.example`](./deploy/nginx.conf.example) 은
+  호스트(또는 별도 리버스 프록시 서버)의 nginx 설정 예시다. 서로 다른 파일이니 혼동하지 말 것.
+
+### 리버스 프록시가 별도 VM에 있는 경우 (같은 프라이빗 네트워크)
+
+`HanRightThat_30` 과 마찬가지다: `.env` 의 `BIND_ADDR` 을 이 VM의 프라이빗 IP로 설정하고, 방화벽에서
+리버스 프록시 서버의 IP만 3100 포트에 접근하도록 제한한 뒤, 그 프록시 서버에 등록하는
+[`deploy/nginx.conf.example`](./deploy/nginx.conf.example) 의 `proxy_pass` 를 이 VM의 프라이빗 IP로 바꾼다.
+자세한 이유/절차는 `HanRightThat_30` 저장소 README 의 "리버스 프록시가 별도 VM에 있는 경우" 항목 참고.
 - `nginx.conf` 는 `X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy`/`Content-Security-Policy`(검색엔진 색인
   방지용 `X-Robots-Tag` 포함)를 붙인다. **`VITE_API_URL` 을 `https://hanwol.site` 가 아닌 다른 도메인으로 바꾸면
   `nginx.conf` 의 CSP `connect-src` 도 그 도메인으로 함께 바꿔야 fetch 가 막히지 않는다.**
