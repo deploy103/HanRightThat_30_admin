@@ -85,6 +85,10 @@ docker compose up -d --build
 - 컨테이너는 `127.0.0.1:3100` 에만 바인딩된다 — 외부에서는 반드시 리버스 프록시를 통해 접근한다.
 - `nginx.conf` 는 컨테이너 **내부** nginx 설정(SPA fallback 용)이고, [`deploy/nginx.conf.example`](./deploy/nginx.conf.example) 은
   호스트의 리버스 프록시(`admin.hanwol.site` → `127.0.0.1:3100`) 설정 예시다. 서로 다른 파일이니 혼동하지 말 것.
+- `nginx.conf` 는 `X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy`/`Content-Security-Policy`(검색엔진 색인
+  방지용 `X-Robots-Tag` 포함)를 붙인다. **`VITE_API_URL` 을 `https://hanwol.site` 가 아닌 다른 도메인으로 바꾸면
+  `nginx.conf` 의 CSP `connect-src` 도 그 도메인으로 함께 바꿔야 fetch 가 막히지 않는다.**
+- `public/robots.txt` 로 전체 색인을 막는다 (관리자 화면이 검색엔진에 노출되지 않도록).
 
 ## Nginx (호스트 리버스 프록시)
 
