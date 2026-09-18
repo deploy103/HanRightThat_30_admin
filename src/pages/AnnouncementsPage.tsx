@@ -81,7 +81,7 @@ export function AnnouncementsPage() {
         </button>
       </div>
       <p style={{ color: 'var(--dim)', fontSize: 13, marginTop: -12, marginBottom: 20 }}>
-        게시된 공지만 <code>/api/public/announcements</code> 로 노출됩니다. 현재는 공개 화면에 아직 표시되지 않습니다.
+        게시된 공지만 소개 페이지(<code>/</code>)의 "공지" 구역에 노출됩니다. 게시 여부를 끄면 즉시 사라집니다.
       </p>
 
       {error ? <div className="error-banner">{error}</div> : null}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, ApiError } from '../lib/api';
+import { API_URL, api, ApiError } from '../lib/api';
 import { formatWon } from '../lib/format';
 import type { Booth, BoothInput, FloorId } from '../types';
 
@@ -12,7 +12,15 @@ const EMPTY_FORM: BoothInput = {
   position: { x: 50, y: 50 },
   isActive: true,
   isPublic: true,
+  summary: '',
+  description: '',
+  imagePath: '',
+  imageAlt: '',
 };
+
+function publicBoothMapUrl(id: string): string {
+  return `${API_URL}/play/map?booth=${encodeURIComponent(id)}`;
+}
 
 export function BoothsPage() {
   const [booths, setBooths] = useState<Booth[] | null>(null);
@@ -51,6 +59,10 @@ export function BoothsPage() {
       position: booth.position,
       isActive: booth.isActive,
       isPublic: booth.isPublic,
+      summary: booth.summary ?? '',
+      description: booth.description ?? '',
+      imagePath: booth.imagePath ?? '',
+      imageAlt: booth.imageAlt ?? '',
     });
     setShowForm(true);
   }
@@ -202,6 +214,62 @@ export function BoothsPage() {
               <label htmlFor="booth-public">공개</label>
             </div>
           </div>
+
+          <h3 style={{ margin: '4px 0 12px', fontSize: 14, color: 'var(--dim)' }}>소개 페이지용 정보 (선택)</h3>
+          <p style={{ margin: '-8px 0 12px', color: 'var(--dim)', fontSize: 12 }}>
+            아래 항목은 소개 페이지(hanwol.site) 부스 미리보기에 쓰인다. 비워 두면 소개 페이지에서는 기본
+            그래픽으로 대체된다.
+          </p>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="booth-summary">한 줄 소개 (최대 300자)</label>
+              <input
+                id="booth-summary"
+                value={form.summary ?? ''}
+                maxLength={300}
+                onChange={(event) => setForm((f) => ({ ...f, summary: event.target.value }))}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="booth-image-path">이미지 경로</label>
+              <input
+                id="booth-image-path"
+                value={form.imagePath ?? ''}
+                placeholder="/booth-images/example.jpg"
+                onChange={(event) => setForm((f) => ({ ...f, imagePath: event.target.value }))}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="booth-image-alt">이미지 대체 텍스트 (이미지 경로 입력 시 필수)</label>
+              <input
+                id="booth-image-alt"
+                value={form.imageAlt ?? ''}
+                maxLength={200}
+                onChange={(event) => setForm((f) => ({ ...f, imageAlt: event.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="field" style={{ marginBottom: 14 }}>
+            <label htmlFor="booth-description">상세 설명 (최대 3000자)</label>
+            <textarea
+              id="booth-description"
+              rows={3}
+              value={form.description ?? ''}
+              maxLength={3000}
+              onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
+            />
+          </div>
+          {form.imagePath ? (
+            <p style={{ margin: '0 0 14px', color: 'var(--dim)', fontSize: 12 }}>
+              미리보기는 공개 사이트 기준 경로입니다 —{' '}
+              <a href={`${API_URL}${form.imagePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--cyan)' }}>
+                {API_URL}
+                {form.imagePath}
+              </a>{' '}
+              (이미지가 열리지 않으면 파일이 아직 공개 저장소의 <code>public/booth-images/</code>에 없다는 뜻입니다)
+            </p>
+          ) : null}
+
           <div className="actions-row">
             <button type="submit" className="btn btn-primary">
               저장
@@ -262,6 +330,20 @@ export function BoothsPage() {
                       <button type="button" className="btn btn-sm btn-danger" onClick={() => handleArchive(booth.id)}>
                         보관
                       </button>
+                    )}
+                    {booth.isPublic && !booth.archivedAt ? (
+                      <a
+                        className="btn btn-sm"
+                        href={publicBoothMapUrl(booth.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        공개 위치 보기
+                      </a>
+                    ) : (
+                      <span className="pill pill-off" title="비공개·보관 부스는 공개 지도 링크로 확인할 수 없습니다.">
+                        공개 링크 없음
+                      </span>
                     )}
                   </div>
                 </td>

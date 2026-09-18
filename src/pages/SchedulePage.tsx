@@ -69,8 +69,8 @@ export function SchedulePage() {
         </button>
       </div>
       <p style={{ color: 'var(--dim)', fontSize: 13, marginTop: -12, marginBottom: 20 }}>
-        개회식/폐회식 등 축제 전체 진행 순서. 공연 순서와는 별도이며, 현재는 공개 화면에는 아직 노출되지 않고
-        API(<code>/api/public/schedule</code>)로만 제공됩니다.
+        개회식/폐회식 등 축제 전체 진행 순서. 공연 순서(공연 관리 메뉴)와는 별도이며, 여기서 저장하면
+        소개 페이지(<code>/</code>)의 "축제 전체 일정" 구역에 바로 반영됩니다.
       </p>
 
       {error ? <div className="error-banner">{error}</div> : null}

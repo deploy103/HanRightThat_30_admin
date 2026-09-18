@@ -2,10 +2,12 @@ import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { AuthProvider, useAuthContext } from './hooks/AuthContext';
+import { NavigationGuardProvider } from './hooks/NavigationGuard';
 import { AnnouncementsPage } from './pages/AnnouncementsPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { BoothsPage } from './pages/BoothsPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { PerformancesPage } from './pages/PerformancesPage';
 import { RankingsPage } from './pages/RankingsPage';
@@ -28,6 +30,7 @@ function AdminRoutes() {
       <AppShell>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/landing" element={<LandingPage />} />
           <Route path="/booths" element={<BoothsPage />} />
           <Route path="/performances" element={<PerformancesPage />} />
           <Route path="/schedule" element={<SchedulePage />} />
@@ -44,10 +47,12 @@ function AdminRoutes() {
 export function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/*" element={<AdminRoutes />} />
-      </Routes>
+      <NavigationGuardProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/*" element={<AdminRoutes />} />
+        </Routes>
+      </NavigationGuardProvider>
     </AuthProvider>
   );
 }
