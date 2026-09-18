@@ -6,6 +6,8 @@ import type {
   BoothInput,
   FestivalMeta,
   FestivalSettings,
+  LandingContent,
+  LandingState,
   RankedBooth,
   ScheduleItem,
   ScheduleItemInput,
@@ -13,7 +15,8 @@ import type {
   ShowInput,
 } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL ?? '';
+/** 브라우저가 직접 호출하는 공개 사이트/API 서버 주소. 부스 딥링크 등 공개 URL을 만들 때도 재사용한다. */
+export const API_URL = import.meta.env.VITE_API_URL ?? '';
 const CSRF_COOKIE = 'hanbit_admin_csrf';
 
 export class ApiError extends Error {
@@ -117,4 +120,10 @@ export const api = {
   getRankings: () => request<{ rankingsPublic: boolean; rankings: RankedBooth[] }>('/rankings'),
 
   getAuditLogs: (limit = 200) => request<AuditLogEntry[]>(`/audit-logs?limit=${limit}`),
+
+  getLanding: () => request<LandingState>('/landing'),
+  saveLandingDraft: (expectedRevision: number, content: LandingContent) =>
+    request<LandingState>('/landing', { method: 'PUT', ...json({ expectedRevision, content }) }),
+  publishLanding: (expectedRevision: number) =>
+    request<LandingState>('/landing/publish', { method: 'POST', ...json({ expectedRevision }) }),
 };

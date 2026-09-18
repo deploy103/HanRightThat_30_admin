@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuthContext } from '../hooks/AuthContext';
+import { useNavigationGuard } from '../hooks/NavigationGuard';
 
 const NAV_ITEMS: { to: string; label: string; end?: boolean }[] = [
   { to: '/', label: '대시보드', end: true },
+  { to: '/landing', label: '소개 페이지' },
   { to: '/booths', label: '부스 관리' },
   { to: '/performances', label: '공연 순서' },
   { to: '/schedule', label: '축제 일정' },
@@ -15,6 +17,15 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean }[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { username, logout } = useAuthContext();
+  const { confirmLeave } = useNavigationGuard();
+
+  function guardedClick(event: React.MouseEvent) {
+    if (!confirmLeave()) {
+      event.preventDefault();
+      return;
+    }
+    setOpen(false);
+  }
 
   return (
     <div className="app-shell">
@@ -26,13 +37,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             to={item.to}
             end={item.end}
             className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-            onClick={() => setOpen(false)}
+            onClick={guardedClick}
           >
             {item.label}
           </NavLink>
         ))}
         <div className="sidebar-footer">
-          <button type="button" className="logout-button" onClick={() => void logout()}>
+          <button
+            type="button"
+            className="logout-button"
+            onClick={() => {
+              if (!confirmLeave()) return;
+              void logout();
+            }}
+          >
             {username} 로그아웃
           </button>
         </div>

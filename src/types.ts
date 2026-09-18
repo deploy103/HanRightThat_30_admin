@@ -21,6 +21,10 @@ export interface Booth {
   isActive: boolean;
   isPublic: boolean;
   archivedAt: string | null;
+  summary?: string;
+  description?: string;
+  imagePath?: string;
+  imageAlt?: string;
 }
 
 export type BoothInput = Omit<Booth, 'id' | 'archivedAt'>;
@@ -74,6 +78,47 @@ export interface RankedBooth {
   rank: number;
   tier: RankTier;
   ratio: number;
+}
+
+/**
+ * 소개 콘텐츠 (HANWOL-INTRO-V1). HanRightThat_30 요구사항2.md와 동일한 계약을 따른다.
+ * 두 저장소는 소스를 공유하지 않으므로 타입도 각자 다시 선언한다.
+ */
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface LandingContent {
+  festivalName: string;
+  edition: number;
+  year: number;
+  theme: string;
+  heroTitle: string;
+  heroDescription: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  venueName: string;
+  address: string;
+  directionsUrl: string;
+  themeTitle: string;
+  themeBody: string;
+  audienceInfo: string;
+  admissionInfo: string;
+  paymentInfo: string;
+  operatingHoursInfo: string;
+  contactInfo: string;
+  organizerText: string;
+  creditsText: string;
+  faqItems: FaqItem[];
+}
+
+export interface LandingState {
+  revision: number;
+  draft: LandingContent;
+  published: LandingContent | null;
+  publishedAt: string | null;
 }
 
 export interface AuditLogEntry {

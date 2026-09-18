@@ -1,0 +1,259 @@
+/* 소개 페이지 편집(/landing) 전용 스타일. 기존 base.css의 카드/필드/버튼 톤을 그대로 따른다. */
+
+/* base.css에는 disabled 스타일이 없어서, 비활성화된 게시 버튼이 활성 버튼과 똑같아 보였다.
+   여기서 전역으로 보강한다 (기존 다른 페이지의 disabled 버튼에도 함께 적용된다). */
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.field-hint {
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.field-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--hot);
+  font-weight: 700;
+}
+
+.field-error::before {
+  content: '⚠ ';
+}
+
+.success-banner {
+  background: rgba(212, 255, 63, 0.12);
+  border-color: var(--acid);
+  color: var(--acid);
+}
+
+.faq-editor-item {
+  border: 1px solid var(--wire);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: var(--void);
+}
+
+/* ---------- 미리보기 프레임 ---------- */
+.landing-preview-frame {
+  border: 1px solid var(--wire);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0b0a12;
+  color: #f2efe6;
+  margin: 0 auto;
+}
+
+.landing-preview-desktop {
+  max-width: 100%;
+}
+
+.landing-preview-mobile {
+  max-width: 390px;
+}
+
+.landing-preview-badge {
+  background: var(--deck);
+  border-bottom: 1px solid var(--wire);
+  color: var(--acid);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.landing-preview-scroll {
+  max-height: 640px;
+  overflow-y: auto;
+  padding: 24px 20px;
+}
+
+.lp-hero {
+  margin-bottom: 24px;
+}
+
+.lp-eyebrow {
+  display: inline-block;
+  background: #d4ff3f;
+  color: #0b0a12;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 4px 10px;
+  margin-bottom: 10px;
+}
+
+.lp-title {
+  font-family: 'Black Han Sans', 'Gothic A1', system-ui, sans-serif;
+  font-size: clamp(26px, 6vw, 42px);
+  line-height: 1;
+  margin: 4px 0 8px;
+  text-shadow: 3px 3px 0 #ff1f6d;
+}
+
+.lp-theme {
+  margin: 0 0 8px;
+  color: #8f87a8;
+  font-size: 13px;
+}
+
+.lp-theme b {
+  color: #00e5ff;
+}
+
+.lp-lede {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #cfc9e0;
+}
+
+.lp-facts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #d4ff3f;
+  border: 1px solid #2e2947;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  width: fit-content;
+}
+
+.lp-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lp-btn-primary,
+.lp-btn-secondary {
+  display: inline-flex;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid #2e2947;
+}
+
+.lp-btn-primary {
+  background: #d4ff3f;
+  color: #0b0a12;
+}
+
+.lp-btn-secondary {
+  color: #f2efe6;
+}
+
+.lp-section {
+  padding: 20px 0;
+  border-top: 1px solid #2e2947;
+}
+
+.lp-section-alt {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lp-eyebrow-sm {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #d4ff3f;
+}
+
+.lp-h2 {
+  font-family: 'Black Han Sans', 'Gothic A1', system-ui, sans-serif;
+  font-size: 20px;
+  margin: 0 0 10px;
+}
+
+.lp-h3 {
+  font-family: 'Black Han Sans', 'Gothic A1', system-ui, sans-serif;
+  font-size: 16px;
+  margin: 16px 0 8px;
+}
+
+.lp-body {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.lp-empty {
+  color: #8f87a8;
+  font-size: 12px;
+  border: 1px dashed #2e2947;
+  padding: 10px;
+  margin: 0;
+}
+
+.lp-venue {
+  background: #1c1930;
+  border: 1px solid #2e2947;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.lp-venue-name {
+  margin: 0 0 4px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.lp-venue-address,
+.lp-venue-link {
+  margin: 0;
+  font-size: 12px;
+  color: #8f87a8;
+}
+
+.lp-info-grid {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.lp-info-row dt {
+  font-size: 10px;
+  color: #8f87a8;
+  text-transform: uppercase;
+}
+
+.lp-info-row dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.lp-faq-item {
+  border-bottom: 1px solid #2e2947;
+  padding: 8px 0;
+}
+
+.lp-faq-q {
+  margin: 0;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.lp-faq-a {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #8f87a8;
+  white-space: pre-wrap;
+}
+
+.lp-footer {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  font-size: 11px;
+  color: #8f87a8;
+}
