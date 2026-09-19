@@ -7,6 +7,7 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean }[] = [
   { to: '/', label: '대시보드', end: true },
   { to: '/landing', label: '소개 페이지' },
   { to: '/booths', label: '부스 관리' },
+  { to: '/booth-map', label: '부스 배치도' },
   { to: '/performances', label: '공연 순서' },
   { to: '/schedule', label: '축제 일정' },
   { to: '/announcements', label: '공지' },

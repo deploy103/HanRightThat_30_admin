@@ -1,4 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { BoothImageField } from '../components/BoothImageField';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { API_URL, api, ApiError } from '../lib/api';
 import { formatWon } from '../lib/format';
 import type { Booth, BoothInput, FloorId } from '../types';
@@ -10,6 +13,7 @@ const EMPTY_FORM: BoothInput = {
   amount: 0,
   place: '',
   position: { x: 50, y: 50 },
+  size: { w: 14, h: 10 },
   isActive: true,
   isPublic: true,
   summary: '',
@@ -29,6 +33,8 @@ export function BoothsPage() {
   const [form, setForm] = useState<BoothInput>(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState<Booth | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function load() {
     try {
@@ -57,6 +63,7 @@ export function BoothsPage() {
       amount: booth.amount,
       place: booth.place ?? '',
       position: booth.position,
+      size: booth.size,
       isActive: booth.isActive,
       isPublic: booth.isPublic,
       summary: booth.summary ?? '',
@@ -80,13 +87,17 @@ export function BoothsPage() {
     }
   }
 
-  async function handleArchive(id: string) {
-    if (!window.confirm('이 부스를 보관하시겠습니까? 공개 화면에서 즉시 사라집니다.')) return;
+  async function handleArchive() {
+    if (!confirmArchive) return;
+    setBusy(true);
     try {
-      await api.archiveBooth(id);
+      await api.archiveBooth(confirmArchive.id);
+      setConfirmArchive(null);
       await load();
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : '보관하지 못했습니다.');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -166,33 +177,8 @@ export function BoothsPage() {
               <input
                 id="booth-place"
                 value={form.place ?? ''}
+                placeholder="예: 2층 지능형소프트웨어과 1-1 앞"
                 onChange={(event) => setForm((f) => ({ ...f, place: event.target.value }))}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="booth-x">위치 X (0~100)</label>
-              <input
-                id="booth-x"
-                type="number"
-                min={0}
-                max={100}
-                value={form.position.x}
-                onChange={(event) =>
-                  setForm((f) => ({ ...f, position: { ...f.position, x: Number(event.target.value) } }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="booth-y">위치 Y (0~100)</label>
-              <input
-                id="booth-y"
-                type="number"
-                min={0}
-                max={100}
-                value={form.position.y}
-                onChange={(event) =>
-                  setForm((f) => ({ ...f, position: { ...f.position, y: Number(event.target.value) } }))
-                }
               />
             </div>
             <div className="field-checkbox">
@@ -215,6 +201,12 @@ export function BoothsPage() {
             </div>
           </div>
 
+          <p className="inline-note">
+            지도에서의 위치와 크기는 숫자로 입력하지 않습니다 —{' '}
+            <Link to="/booth-map">부스 배치도</Link> 화면에서 끌어서 지정하세요.
+            {editingId ? null : ' 새로 만든 부스는 배치도 가운데에 놓입니다.'}
+          </p>
+
           <h3 style={{ margin: '4px 0 12px', fontSize: 14, color: 'var(--dim)' }}>소개 페이지용 정보 (선택)</h3>
           <p style={{ margin: '-8px 0 12px', color: 'var(--dim)', fontSize: 12 }}>
             아래 항목은 소개 페이지(hanwol.site) 부스 미리보기에 쓰인다. 비워 두면 소개 페이지에서는 기본
@@ -230,24 +222,6 @@ export function BoothsPage() {
                 onChange={(event) => setForm((f) => ({ ...f, summary: event.target.value }))}
               />
             </div>
-            <div className="field">
-              <label htmlFor="booth-image-path">이미지 경로</label>
-              <input
-                id="booth-image-path"
-                value={form.imagePath ?? ''}
-                placeholder="/booth-images/example.jpg"
-                onChange={(event) => setForm((f) => ({ ...f, imagePath: event.target.value }))}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="booth-image-alt">이미지 대체 텍스트 (이미지 경로 입력 시 필수)</label>
-              <input
-                id="booth-image-alt"
-                value={form.imageAlt ?? ''}
-                maxLength={200}
-                onChange={(event) => setForm((f) => ({ ...f, imageAlt: event.target.value }))}
-              />
-            </div>
           </div>
           <div className="field" style={{ marginBottom: 14 }}>
             <label htmlFor="booth-description">상세 설명 (최대 3000자)</label>
@@ -259,16 +233,12 @@ export function BoothsPage() {
               onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
             />
           </div>
-          {form.imagePath ? (
-            <p style={{ margin: '0 0 14px', color: 'var(--dim)', fontSize: 12 }}>
-              미리보기는 공개 사이트 기준 경로입니다 —{' '}
-              <a href={`${API_URL}${form.imagePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--cyan)' }}>
-                {API_URL}
-                {form.imagePath}
-              </a>{' '}
-              (이미지가 열리지 않으면 파일이 아직 공개 저장소의 <code>public/booth-images/</code>에 없다는 뜻입니다)
-            </p>
-          ) : null}
+          <BoothImageField
+            imagePath={form.imagePath ?? ''}
+            imageAlt={form.imageAlt ?? ''}
+            altFallback={form.name}
+            onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+          />
 
           <div className="actions-row">
             <button type="submit" className="btn btn-primary">
@@ -322,12 +292,17 @@ export function BoothsPage() {
                     <button type="button" className="btn btn-sm" onClick={() => startEdit(booth)}>
                       수정
                     </button>
+                    {booth.archivedAt ? null : (
+                      <Link className="btn btn-sm" to="/booth-map">
+                        배치도
+                      </Link>
+                    )}
                     {booth.archivedAt ? (
                       <button type="button" className="btn btn-sm" onClick={() => handleRestore(booth.id)}>
                         복원
                       </button>
                     ) : (
-                      <button type="button" className="btn btn-sm btn-danger" onClick={() => handleArchive(booth.id)}>
+                      <button type="button" className="btn btn-sm btn-danger" onClick={() => setConfirmArchive(booth)}>
                         보관
                       </button>
                     )}
@@ -352,6 +327,22 @@ export function BoothsPage() {
           </tbody>
         </table>
       )}
+
+      <ConfirmDialog
+        open={confirmArchive !== null}
+        title="이 부스를 보관할까요?"
+        description={
+          <>
+            <b>{confirmArchive?.name}</b> 부스가 공개 화면(지도 · 부스 목록 · 순위)에서 즉시 사라집니다. 데이터는 남아
+            있어 "보관된 부스 표시"에서 다시 복원할 수 있습니다.
+          </>
+        }
+        confirmLabel="보관"
+        danger
+        busy={busy}
+        onConfirm={() => void handleArchive()}
+        onCancel={() => setConfirmArchive(null)}
+      />
     </>
   );
 }

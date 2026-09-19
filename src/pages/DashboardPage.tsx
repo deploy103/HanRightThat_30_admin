@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API_URL, api, ApiError } from '../lib/api';
 import { formatDateTime, formatWon } from '../lib/format';
-import type { AuditLogEntry, Booth, FestivalSettings, LandingState } from '../types';
+import type { AuditLogEntry, Booth, FestivalSettings, LandingState, TwoFactorStatus } from '../types';
 
 export function DashboardPage() {
   const [booths, setBooths] = useState<Booth[] | null>(null);
@@ -10,6 +10,7 @@ export function DashboardPage() {
   const [settings, setSettings] = useState<FestivalSettings | null>(null);
   const [landing, setLanding] = useState<LandingState | null>(null);
   const [landingUnavailable, setLandingUnavailable] = useState(false);
+  const [twoFactor, setTwoFactor] = useState<TwoFactorStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function DashboardPage() {
 
     // 소개 API는 서버 업데이트가 아직 안 된 환경에서는 404일 수 있다 — 그 경우 나머지 대시보드는 그대로 쓴다.
     api.getLanding().then(setLanding).catch(() => setLandingUnavailable(true));
+    api.twoFactorStatus().then(setTwoFactor).catch(() => setTwoFactor(null));
   }, []);
 
   const activeBooths = (booths ?? []).filter((booth) => !booth.archivedAt);
@@ -49,6 +51,16 @@ export function DashboardPage() {
         <div className="stat-card">
           <div className="stat-label">순위 공개 상태</div>
           <div className="stat-value">{settings ? (settings.rankingsPublic ? '공개' : '비공개') : '-'}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">2단계 인증</div>
+          <div className="stat-value">{twoFactor ? (twoFactor.enabled ? '사용 중' : '미설정') : '-'}</div>
+          {twoFactor?.enabled ? (
+            <div className="stat-sub">
+              남은 복구 코드 {twoFactor.remainingRecoveryCodes}개
+              {twoFactor.remainingRecoveryCodes <= 2 ? ' · 부족합니다' : ''}
+            </div>
+          ) : null}
         </div>
       </div>
 
