@@ -6,8 +6,15 @@
 export type FloorId = 2 | 3;
 
 export interface BoothPosition {
+  /** 배치도 대비 % (부스 영역의 중심) */
   x: number;
   y: number;
+}
+
+/** 부스 영역 크기 (배치도 대비 %). 픽셀이 아니라서 화면 크기가 달라도 위치가 맞는다. */
+export interface BoothSize {
+  w: number;
+  h: number;
 }
 
 export interface Booth {
@@ -18,6 +25,7 @@ export interface Booth {
   amount: number;
   place?: string;
   position: BoothPosition;
+  size?: BoothSize;
   isActive: boolean;
   isPublic: boolean;
   archivedAt: string | null;
@@ -131,4 +139,87 @@ export interface AuditLogEntry {
   before: unknown;
   after: unknown;
   ip: string;
+}
+
+// ---------------------------------------------------------------------------
+// 층 배치도 (GET /api/public/floor-plans) — 공개 사이트 렌더러와 같은 데이터를 쓴다.
+// 이 저장소에 레이아웃을 복제해 두면 두 화면의 좌표가 어긋나므로 항상 API 에서 받아 온다.
+// ---------------------------------------------------------------------------
+
+export type RoomTone = 'room' | 'special' | 'stair' | 'service';
+
+export interface FloorRoom {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tone: RoomTone;
+}
+
+export interface FloorPlanDef {
+  id: FloorId;
+  label: string;
+  hint: string;
+  rooms: FloorRoom[];
+}
+
+export interface FloorPlansResponse {
+  aspect: { width: number; height: number };
+  defaultBoothSize: BoothSize;
+  minBoothSize: BoothSize;
+  floors: FloorPlanDef[];
+}
+
+// ---------------------------------------------------------------------------
+// 인증 / 2단계 인증
+// ---------------------------------------------------------------------------
+
+/** PASSWORD_VERIFIED = 비밀번호만 통과(관리자 API 사용 불가) / TWO_FACTOR_VERIFIED = 정식 관리자 세션 */
+export type SessionStage = 'PASSWORD_VERIFIED' | 'TWO_FACTOR_VERIFIED';
+
+/** 다음에 무엇을 해야 하는지 — setup(최초 등록) / verify(코드 입력) / null(완료) */
+export type AuthNextStep = 'setup' | 'verify' | null;
+
+export interface SessionInfo {
+  username: string | null;
+  stage: SessionStage | null;
+  twoFactorEnabled: boolean;
+  next: AuthNextStep;
+}
+
+export interface TwoFactorSetupResponse {
+  /** 수동 입력용 키. 등록이 끝나면 다시는 조회할 수 없다. */
+  secret: string;
+  otpauthUrl: string;
+  /** data: URL 형태의 QR 이미지 */
+  qrDataUrl: string;
+  issuer: string;
+}
+
+export interface TwoFactorEnableResponse {
+  username: string;
+  stage: SessionStage;
+  /** 최초 1회만 내려오는 복구 코드 원문 */
+  recoveryCodes: string[];
+}
+
+export interface TwoFactorVerifyResponse {
+  username: string;
+  stage: SessionStage;
+  usedRecoveryCode: boolean;
+  remainingRecoveryCodes: number;
+}
+
+export interface TwoFactorStatus {
+  enabled: boolean;
+  enabledAt: string | null;
+  remainingRecoveryCodes: number;
+}
+
+export interface UploadedImage {
+  imagePath: string;
+  bytes: number;
+  mimeType: string;
 }

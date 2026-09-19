@@ -6,13 +6,20 @@ import type {
   BoothInput,
   FestivalMeta,
   FestivalSettings,
+  FloorPlansResponse,
   LandingContent,
   LandingState,
   RankedBooth,
   ScheduleItem,
   ScheduleItemInput,
+  SessionInfo,
   Show,
   ShowInput,
+  TwoFactorEnableResponse,
+  TwoFactorSetupResponse,
+  TwoFactorStatus,
+  TwoFactorVerifyResponse,
+  UploadedImage,
 } from '../types';
 
 /** 브라우저가 직접 호출하는 공개 사이트/API 서버 주소. 부스 딥링크 등 공개 URL을 만들 때도 재사용한다. */
@@ -70,14 +77,54 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * 이미지 업로드. multipart 대신 파일 바이트를 그대로 본문으로 보낸다
+ * (서버가 Content-Type 과 실제 매직 넘버를 함께 검사한다).
+ */
+async function uploadImage(file: File): Promise<UploadedImage> {
+  const headers = new Headers({ 'Content-Type': file.type });
+  const csrf = readCookie(CSRF_COOKIE);
+  if (csrf) headers.set('X-CSRF-Token', csrf);
+
+  const response = await fetch(`${API_URL}/api/admin/booth-images`, {
+    method: 'POST',
+    headers,
+    body: file,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    let message = `업로드가 실패했습니다. (${response.status})`;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      /* 본문이 JSON 이 아니면 기본 메시지를 쓴다. */
+    }
+    throw new ApiError(response.status, message);
+  }
+  return (await response.json()) as UploadedImage;
+}
+
 const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) });
 
 export const api = {
+  /** 1단계: 비밀번호만 검증한다. 성공해도 아직 관리자 API 는 쓸 수 없다. */
   login: (username: string, password: string) =>
-    request<{ username: string }>('/auth/login', { method: 'POST', ...json({ username, password }) }),
+    request<SessionInfo>('/auth/login', { method: 'POST', ...json({ username, password }) }),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
-  session: () => request<{ username: string | null }>('/auth/session'),
+  session: () => request<SessionInfo>('/auth/session'),
   me: () => request<{ username: string; lastLoginAt: string | null }>('/me'),
+
+  /** 2단계: 최초 등록(QR 발급 → 코드 확인) 또는 로그인 시 코드 검증. */
+  twoFactorSetup: () => request<TwoFactorSetupResponse>('/auth/2fa/setup', { method: 'POST' }),
+  twoFactorEnable: (code: string) =>
+    request<TwoFactorEnableResponse>('/auth/2fa/enable', { method: 'POST', ...json({ code }) }),
+  twoFactorVerify: (code: string) =>
+    request<TwoFactorVerifyResponse>('/auth/2fa/verify', { method: 'POST', ...json({ code }) }),
+  twoFactorRecover: (recoveryCode: string) =>
+    request<TwoFactorVerifyResponse>('/auth/2fa/verify', { method: 'POST', ...json({ recoveryCode }) }),
+  twoFactorStatus: () => request<TwoFactorStatus>('/2fa/status'),
 
   getBooths: () => request<Booth[]>('/booths'),
   createBooth: (input: BoothInput) => request<Booth>('/booths', { method: 'POST', ...json(input) }),
@@ -85,6 +132,18 @@ export const api = {
     request<Booth>(`/booths/${id}`, { method: 'PUT', ...json(input) }),
   archiveBooth: (id: string) => request<Booth>(`/booths/${id}`, { method: 'DELETE' }),
   restoreBooth: (id: string) => request<Booth>(`/booths/${id}/restore`, { method: 'POST' }),
+
+  uploadBoothImage: uploadImage,
+  deleteBoothImage: (imagePath: string) =>
+    request<void>(`/booth-images/${encodeURIComponent(imagePath.replace('/booth-images/', ''))}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * 공개 사이트 렌더러와 동일한 층 배치도 (서버의 shared/floorPlans.ts 하나에서 나온다).
+   * 관리자 API 로 받는 이유는 이 오리진에 대한 CORS/자격증명 설정이 /api/admin/* 에만 있기 때문이다.
+   */
+  getFloorPlans: () => request<FloorPlansResponse>('/floor-plans'),
 
   getPerformances: () => request<Show[]>('/performances'),
   createPerformance: (input: ShowInput) =>

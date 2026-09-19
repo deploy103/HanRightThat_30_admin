@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api, ApiError } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import type { Announcement, AnnouncementInput } from '../types';
@@ -11,6 +12,8 @@ export function AnnouncementsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AnnouncementInput>(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Announcement | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function load() {
     try {
@@ -62,13 +65,17 @@ export function AnnouncementsPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('이 공지를 삭제하시겠습니까?')) return;
+  async function handleDelete() {
+    if (!confirmDelete) return;
+    setBusy(true);
     try {
-      await api.deleteAnnouncement(id);
+      await api.deleteAnnouncement(confirmDelete.id);
+      setConfirmDelete(null);
       await load();
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : '삭제하지 못했습니다.');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -81,7 +88,9 @@ export function AnnouncementsPage() {
         </button>
       </div>
       <p style={{ color: 'var(--dim)', fontSize: 13, marginTop: -12, marginBottom: 20 }}>
-        게시된 공지만 소개 페이지(<code>/</code>)의 "공지" 구역에 노출됩니다. 게시 여부를 끄면 즉시 사라집니다.
+        게시된 공지만 공개 사이트에 노출됩니다 — 소개 페이지(<code>/</code>)의 "공지" 구역과 축제 화면의{' '}
+        <code>/play/notice</code> 공지 탭 두 곳입니다. 게시 여부를 끄면 즉시 사라집니다. 내용은 일반 텍스트로만
+        표시되며 HTML 태그는 그대로 글자로 보입니다.
       </p>
 
       {error ? <div className="error-banner">{error}</div> : null}
@@ -102,11 +111,13 @@ export function AnnouncementsPage() {
             <label htmlFor="announcement-body">내용</label>
             <textarea
               id="announcement-body"
-              rows={4}
+              rows={6}
+              maxLength={2000}
               value={form.body}
               onChange={(event) => setForm((f) => ({ ...f, body: event.target.value }))}
               required
             />
+            <p className="field-hint">줄바꿈은 공개 화면에도 그대로 표시됩니다. (최대 2000자)</p>
           </div>
           <div className="field-checkbox" style={{ marginTop: 0, marginBottom: 12 }}>
             <input
@@ -162,7 +173,7 @@ export function AnnouncementsPage() {
                     <button type="button" className="btn btn-sm" onClick={() => startEdit(item)}>
                       수정
                     </button>
-                    <button type="button" className="btn btn-sm btn-danger" onClick={() => handleDelete(item.id)}>
+                    <button type="button" className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(item)}>
                       삭제
                     </button>
                   </div>
@@ -172,6 +183,22 @@ export function AnnouncementsPage() {
           </tbody>
         </table>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="이 공지를 삭제할까요?"
+        description={
+          <>
+            <b>{confirmDelete?.title}</b> 공지가 완전히 삭제됩니다. 되돌릴 수 없으니, 잠시 내리기만 하려면 대신 "비공개로"를
+            사용하세요.
+          </>
+        }
+        confirmLabel="삭제"
+        danger
+        busy={busy}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </>
   );
 }
