@@ -4,7 +4,7 @@ import { BoothImageField } from '../components/BoothImageField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { API_URL, api, ApiError } from '../lib/api';
 import { formatWon } from '../lib/format';
-import type { Booth, BoothInput, FloorId } from '../types';
+import type { Booth, BoothInput, FloorId, FloorPlanDef } from '../types';
 
 const EMPTY_FORM: BoothInput = {
   name: '',
@@ -28,6 +28,8 @@ function publicBoothMapUrl(id: string): string {
 
 export function BoothsPage() {
   const [booths, setBooths] = useState<Booth[] | null>(null);
+  /** 층 목록/이름은 배치도에서 받아 온다 — 층이 늘어나도 이 화면을 고칠 필요가 없다. */
+  const [floors, setFloors] = useState<FloorPlanDef[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<BoothInput>(EMPTY_FORM);
@@ -46,6 +48,11 @@ export function BoothsPage() {
 
   useEffect(() => {
     void load();
+    // 층 목록을 못 받아도 부스 관리 자체는 되어야 하므로 실패는 조용히 넘긴다(선택지만 비어 있게 된다).
+    void api
+      .getFloorPlans()
+      .then((plans) => setFloors(plans.floors))
+      .catch(() => undefined);
   }, []);
 
   function startCreate() {
@@ -158,8 +165,15 @@ export function BoothsPage() {
                 value={form.floor}
                 onChange={(event) => setForm((f) => ({ ...f, floor: Number(event.target.value) as FloorId }))}
               >
-                <option value={2}>2층</option>
-                <option value={3}>3층</option>
+                {/* 배치도를 못 받았을 때도 선택지가 비지 않도록 현재 층은 항상 남긴다. */}
+                {(floors.length > 0
+                  ? floors.map((item) => ({ id: item.id, label: item.label }))
+                  : [{ id: form.floor, label: `${form.floor}층` }]
+                ).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="field">

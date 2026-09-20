@@ -3,7 +3,7 @@
  * 두 저장소는 파일을 공유하지 않으므로(오직 HTTP API 로만 연결) 타입을 각자 유지한다.
  */
 
-export type FloorId = 2 | 3;
+export type FloorId = 2 | 3 | 4;
 
 export interface BoothPosition {
   /** 배치도 대비 % (부스 영역의 중심) */
@@ -169,8 +169,17 @@ export interface FloorPlansResponse {
   aspect: { width: number; height: number };
   defaultBoothSize: BoothSize;
   minBoothSize: BoothSize;
+  /** 교실 칸의 최소 크기(%) — 서버가 같은 값으로 검증한다. */
+  minRoomSize: BoothSize;
+  /** 한 층에 둘 수 있는 칸 수 상한. */
+  maxRoomsPerFloor: number;
+  /** 칸 종류 선택지. 서버가 허용하는 값과 항상 같다. */
+  roomTones: RoomTone[];
   floors: FloorPlanDef[];
 }
+
+/** 한 층의 배치도 저장 입력 — id 는 URL 로 보내므로 본문에 없다. */
+export type FloorPlanInput = Omit<FloorPlanDef, 'id'>;
 
 // ---------------------------------------------------------------------------
 // 인증 / 2단계 인증

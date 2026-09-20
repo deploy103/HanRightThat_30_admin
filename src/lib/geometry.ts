@@ -1,4 +1,4 @@
-import type { BoothPosition, BoothSize } from '../types';
+import type { BoothPosition, BoothSize, FloorRoom } from '../types';
 
 /**
  * 부스 좌표 계산.
@@ -41,6 +41,25 @@ export function fromRect(rect: Rect, min: BoothSize): { position: BoothPosition;
   return {
     position: { x: roundPercent(left + w / 2), y: roundPercent(top + h / 2) },
     size: { w: roundPercent(w), h: roundPercent(h) },
+  };
+}
+
+/**
+ * 교실 칸은 부스와 달리 "왼쪽 위 + 크기" 로 저장되므로 변환이 그대로다.
+ * (서버 clampRoomGeometry 와 같은 규칙 — 크기를 먼저 최소값까지 키운 뒤 위치를 안쪽으로 민다.)
+ */
+export function roomToRect(room: Pick<FloorRoom, 'x' | 'y' | 'w' | 'h'>): Rect {
+  return { left: room.x, top: room.y, width: room.w, height: room.h };
+}
+
+export function rectToRoom(rect: Rect, min: BoothSize): Pick<FloorRoom, 'x' | 'y' | 'w' | 'h'> {
+  const w = clamp(rect.width, min.w, 100);
+  const h = clamp(rect.height, min.h, 100);
+  return {
+    x: roundPercent(clamp(rect.left, 0, 100 - w)),
+    y: roundPercent(clamp(rect.top, 0, 100 - h)),
+    w: roundPercent(w),
+    h: roundPercent(h),
   };
 }
 

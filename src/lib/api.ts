@@ -6,6 +6,9 @@ import type {
   BoothInput,
   FestivalMeta,
   FestivalSettings,
+  FloorId,
+  FloorPlanDef,
+  FloorPlanInput,
   FloorPlansResponse,
   LandingContent,
   LandingState,
@@ -140,10 +143,16 @@ export const api = {
     }),
 
   /**
-   * 공개 사이트 렌더러와 동일한 층 배치도 (서버의 shared/floorPlans.ts 하나에서 나온다).
+   * 공개 사이트 렌더러와 동일한 층 배치도 (서버의 저장 데이터 하나에서 나온다).
    * 관리자 API 로 받는 이유는 이 오리진에 대한 CORS/자격증명 설정이 /api/admin/* 에만 있기 때문이다.
    */
   getFloorPlans: () => request<FloorPlansResponse>('/floor-plans'),
+  /** 한 층의 배치도를 통째로 저장한다 (칸 추가/삭제/이동/이름 변경이 모두 이 요청 하나로 반영된다). */
+  updateFloorPlan: (floor: FloorId, input: FloorPlanInput) =>
+    request<FloorPlanDef>(`/floor-plans/${floor}`, { method: 'PUT', ...json(input) }),
+  /** 그 층만 서버의 기본 배치도로 되돌린다. 부스는 건드리지 않는다. */
+  resetFloorPlan: (floor: FloorId) =>
+    request<FloorPlanDef>(`/floor-plans/${floor}/reset`, { method: 'POST' }),
 
   getPerformances: () => request<Show[]>('/performances'),
   createPerformance: (input: ShowInput) =>

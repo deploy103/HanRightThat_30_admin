@@ -1,27 +1,58 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { FloorPlanCanvas } from '../components/FloorPlanCanvas';
+import { FloorPlanCanvas, type RoomInteraction } from '../components/FloorPlanCanvas';
+import { RoomPanel, toneLabel } from '../components/RoomPanel';
 import { api, ApiError } from '../lib/api';
 import {
   clampRectInside,
   fromRect,
+  rectToRoom,
   resizeRect,
   RESIZE_HANDLES,
+  roomToRect,
   roundPercent,
   toRect,
   type Rect,
   type ResizeHandle,
 } from '../lib/geometry';
-import type { Booth, BoothInput, BoothSize, FloorId, FloorPlansResponse } from '../types';
+import type {
+  Booth,
+  BoothInput,
+  BoothSize,
+  FloorId,
+  FloorPlanDef,
+  FloorPlansResponse,
+  FloorRoom,
+  RoomTone,
+} from '../types';
 
-/** 드래그로 새 부스를 만들 때, 이보다 작으면 "잘못 누른 것"으로 보고 무시한다. */
+/** 드래그로 새 부스/칸을 만들 때, 이보다 작으면 "잘못 누른 것"으로 보고 무시한다. */
 const MIN_CREATE_SIZE = 3;
+
+/** 서버 응답이 오기 전에 쓰는 대비값 — 실제 값은 /floor-plans 가 내려준다. */
+const FALLBACK = {
+  boothSize: { w: 14, h: 10 } as BoothSize,
+  minBoothSize: { w: 4, h: 4 } as BoothSize,
+  minRoomSize: { w: 3, h: 3 } as BoothSize,
+  roomTones: ['room', 'special', 'stair', 'service'] as RoomTone[],
+  maxRooms: 40,
+};
+
+/** 편집 대상 — 부스를 옮기는 모드와 교실 칸을 고치는 모드를 한 캔버스에서 번갈아 쓴다. */
+type EditMode = 'booth' | 'room';
 
 type SaveState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'saved'; at: number } | { kind: 'error'; message: string };
 
 type Drag =
-  | { mode: 'move'; id: string; startRect: Rect; origin: { x: number; y: number } }
-  | { mode: 'resize'; id: string; handle: ResizeHandle; startRect: Rect; origin: { x: number; y: number } }
+  | { mode: 'move'; target: EditMode; id: string; startRect: Rect; origin: { x: number; y: number } }
+  | {
+      mode: 'resize';
+      target: EditMode;
+      id: string;
+      handle: ResizeHandle;
+      startRect: Rect;
+      origin: { x: number; y: number };
+    }
   | { mode: 'create'; origin: { x: number; y: number }; current: { x: number; y: number } };
 
 interface NewBoothDraft {
@@ -54,17 +85,26 @@ function toInput(booth: Booth, overrides: Partial<BoothInput> = {}): BoothInput 
   };
 }
 
+/** 새 칸 id — 서버도 겹치면 새로 만들어 주지만, 화면에서 바로 key 로 쓰려면 여기서도 필요하다. */
+function newRoomId(floor: FloorId): string {
+  return `${floor}-room-${Date.now().toString(36)}`;
+}
+
 export function BoothMapPage() {
   const [plans, setPlans] = useState<FloorPlansResponse | null>(null);
   const [booths, setBooths] = useState<Booth[] | null>(null);
   const [floor, setFloor] = useState<FloorId>(2);
+  const [mode, setMode] = useState<EditMode>('booth');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [draftRect, setDraftRect] = useState<Rect | null>(null);
   const [newBooth, setNewBooth] = useState<NewBoothDraft | null>(null);
   const [save, setSave] = useState<SaveState>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
   const [confirmArchive, setConfirmArchive] = useState<Booth | null>(null);
+  const [confirmRoomDelete, setConfirmRoomDelete] = useState<FloorRoom | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -73,8 +113,11 @@ export function BoothMapPage() {
 
   // 서버가 내려주는 값이 없을 때만 쓰는 대비값. 매 렌더마다 새 객체가 되지 않도록 메모한다
   // (드래그 핸들러의 의존성이 계속 바뀌면 이동 중에 리스너가 재등록된다).
-  const defaultSize: BoothSize = useMemo(() => plans?.defaultBoothSize ?? { w: 14, h: 10 }, [plans]);
-  const minSize: BoothSize = useMemo(() => plans?.minBoothSize ?? { w: 4, h: 4 }, [plans]);
+  const defaultSize: BoothSize = useMemo(() => plans?.defaultBoothSize ?? FALLBACK.boothSize, [plans]);
+  const minSize: BoothSize = useMemo(() => plans?.minBoothSize ?? FALLBACK.minBoothSize, [plans]);
+  const minRoomSize: BoothSize = useMemo(() => plans?.minRoomSize ?? FALLBACK.minRoomSize, [plans]);
+  const roomTones: RoomTone[] = useMemo(() => plans?.roomTones ?? FALLBACK.roomTones, [plans]);
+  const maxRooms = plans?.maxRoomsPerFloor ?? FALLBACK.maxRooms;
 
   const load = useCallback(async () => {
     try {
@@ -96,6 +139,7 @@ export function BoothMapPage() {
   const activeBooths = useMemo(() => (booths ?? []).filter((booth) => !booth.archivedAt), [booths]);
   const floorBooths = useMemo(() => activeBooths.filter((booth) => booth.floor === floor), [activeBooths, floor]);
   const selected = activeBooths.find((booth) => booth.id === selectedId) ?? null;
+  const selectedRoom = plan?.rooms.find((room) => room.id === selectedRoomId) ?? null;
 
   // --- 좌표 변환: 화면 픽셀 → 배치도 % --------------------------------------
 
@@ -128,6 +172,44 @@ export function BoothMapPage() {
     [load, minSize],
   );
 
+  /**
+   * 층 배치도는 칸 하나만 바꿔도 층 전체를 PUT 한다 (서버가 층 단위로 검증·저장한다).
+   * 화면을 먼저 바꾸고(낙관적 반영) 서버 응답으로 덮어써, 드래그 직후 칸이 되돌아가 보이지 않게 한다.
+   */
+  const savePlan = useCallback(
+    async (next: FloorPlanDef) => {
+      setSave({ kind: 'saving' });
+      setPlans((current) =>
+        current ? { ...current, floors: current.floors.map((item) => (item.id === next.id ? next : item)) } : current,
+      );
+      try {
+        const saved = await api.updateFloorPlan(next.id, { label: next.label, hint: next.hint, rooms: next.rooms });
+        setPlans((current) =>
+          current
+            ? { ...current, floors: current.floors.map((item) => (item.id === saved.id ? saved : item)) }
+            : current,
+        );
+        setSave({ kind: 'saved', at: Date.now() });
+      } catch (cause) {
+        setSave({ kind: 'error', message: cause instanceof ApiError ? cause.message : '저장하지 못했습니다.' });
+        void load();
+      }
+    },
+    [load],
+  );
+
+  const persistRoomGeometry = useCallback(
+    (roomId: string, rect: Rect) => {
+      if (!plan) return;
+      const geometry = rectToRoom(rect, minRoomSize);
+      void savePlan({
+        ...plan,
+        rooms: plan.rooms.map((room) => (room.id === roomId ? { ...room, ...geometry } : room)),
+      });
+    },
+    [minRoomSize, plan, savePlan],
+  );
+
   // --- 드래그 (이동/크기 조절/새로 만들기) ------------------------------------
 
   useEffect(() => {
@@ -144,6 +226,7 @@ export function BoothMapPage() {
         return;
       }
 
+      const min = current.target === 'room' ? minRoomSize : minSize;
       const dx = point.x - current.origin.x;
       const dy = point.y - current.origin.y;
       if (current.mode === 'move') {
@@ -155,7 +238,7 @@ export function BoothMapPage() {
           }),
         );
       } else {
-        setDraftRect(resizeRect(current.startRect, current.handle, dx, dy, minSize));
+        setDraftRect(resizeRect(current.startRect, current.handle, dx, dy, min));
       }
     }
 
@@ -172,8 +255,22 @@ export function BoothMapPage() {
           width: Math.abs(current.current.x - current.origin.x),
           height: Math.abs(current.current.y - current.origin.y),
         });
-        // 살짝 스친 클릭은 새 부스를 만들지 않는다 (잘못된 영역 방지).
+        // 살짝 스친 클릭은 새 영역을 만들지 않는다 (잘못된 영역 방지).
         if (rect.width < MIN_CREATE_SIZE || rect.height < MIN_CREATE_SIZE) return;
+
+        if (mode === 'room') {
+          if (!plan) return;
+          if (plan.rooms.length >= maxRooms) {
+            setError(`한 층에는 칸을 최대 ${maxRooms}개까지 둘 수 있습니다.`);
+            return;
+          }
+          // 칸은 이름만 나중에 고치면 되므로, 폼을 거치지 않고 바로 만들어 선택해 준다.
+          const room: FloorRoom = { id: newRoomId(plan.id), label: '새 칸', tone: 'room', ...rectToRoom(rect, minRoomSize) };
+          setSelectedRoomId(room.id);
+          void savePlan({ ...plan, rooms: [...plan.rooms, room] });
+          return;
+        }
+
         setNewBooth({
           rect,
           name: '',
@@ -186,10 +283,16 @@ export function BoothMapPage() {
         return;
       }
 
-      const booth = (booths ?? []).find((item) => item.id === current.id);
       const rect = draftRect;
       setDraftRect(null);
-      if (booth && rect) void persistGeometry(booth, rect);
+      if (!rect) return;
+
+      if (current.target === 'room') {
+        persistRoomGeometry(current.id, rect);
+        return;
+      }
+      const booth = (booths ?? []).find((item) => item.id === current.id);
+      if (booth) void persistGeometry(booth, rect);
     }
 
     window.addEventListener('pointermove', handleMove);
@@ -200,47 +303,96 @@ export function BoothMapPage() {
       window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('pointercancel', handleUp);
     };
-  }, [drag, booths, draftRect, minSize, persistGeometry, toPercent]);
+  }, [
+    booths,
+    drag,
+    draftRect,
+    maxRooms,
+    minRoomSize,
+    minSize,
+    mode,
+    persistGeometry,
+    persistRoomGeometry,
+    plan,
+    savePlan,
+    toPercent,
+  ]);
+
+  function beginDrag(next: Drag, startRect: Rect) {
+    dragRef.current = next;
+    setDrag(next);
+    setDraftRect(startRect);
+  }
 
   function startMove(event: ReactPointerEvent, booth: Booth) {
     event.stopPropagation();
     event.preventDefault();
     setSelectedId(booth.id);
-    const next: Drag = {
-      mode: 'move',
-      id: booth.id,
-      startRect: toRect(booth.position, booth.size, defaultSize),
-      origin: toPercent(event.clientX, event.clientY),
-    };
-    dragRef.current = next;
-    setDrag(next);
-    setDraftRect(next.startRect);
+    const startRect = toRect(booth.position, booth.size, defaultSize);
+    beginDrag(
+      { mode: 'move', target: 'booth', id: booth.id, startRect, origin: toPercent(event.clientX, event.clientY) },
+      startRect,
+    );
   }
 
   function startResize(event: ReactPointerEvent, booth: Booth, handle: ResizeHandle) {
     event.stopPropagation();
     event.preventDefault();
     setSelectedId(booth.id);
-    const next: Drag = {
-      mode: 'resize',
-      id: booth.id,
-      handle,
-      startRect: toRect(booth.position, booth.size, defaultSize),
-      origin: toPercent(event.clientX, event.clientY),
-    };
-    dragRef.current = next;
-    setDrag(next);
-    setDraftRect(next.startRect);
+    const startRect = toRect(booth.position, booth.size, defaultSize);
+    beginDrag(
+      {
+        mode: 'resize',
+        target: 'booth',
+        id: booth.id,
+        handle,
+        startRect,
+        origin: toPercent(event.clientX, event.clientY),
+      },
+      startRect,
+    );
+  }
+
+  function startRoomMove(event: ReactPointerEvent, room: FloorRoom) {
+    event.stopPropagation();
+    event.preventDefault();
+    setSelectedRoomId(room.id);
+    const startRect = roomToRect(room);
+    beginDrag(
+      { mode: 'move', target: 'room', id: room.id, startRect, origin: toPercent(event.clientX, event.clientY) },
+      startRect,
+    );
+  }
+
+  function startRoomResize(event: ReactPointerEvent, room: FloorRoom, handle: ResizeHandle) {
+    event.stopPropagation();
+    event.preventDefault();
+    setSelectedRoomId(room.id);
+    const startRect = roomToRect(room);
+    beginDrag(
+      {
+        mode: 'resize',
+        target: 'room',
+        id: room.id,
+        handle,
+        startRect,
+        origin: toPercent(event.clientX, event.clientY),
+      },
+      startRect,
+    );
   }
 
   function startCreate(event: ReactPointerEvent<HTMLDivElement>) {
-    // 빈 공간에서 시작한 드래그만 새 부스 만들기로 본다.
-    if (event.target !== event.currentTarget && !(event.target as HTMLElement).classList.contains('fp-room')) {
-      return;
-    }
+    // 빈 공간에서 시작한 드래그만 새로 만들기로 본다.
+    // (부스 모드에서는 교실 칸도 배경일 뿐이라 그 위에서 시작한 드래그를 허용한다.)
+    const onEmptySpace =
+      event.target === event.currentTarget ||
+      (mode === 'booth' && (event.target as HTMLElement).classList.contains('fp-room'));
+    if (!onEmptySpace) return;
     if (newBooth) return;
     event.preventDefault();
     setSelectedId(null);
+    setSelectedRoomId(null);
     const point = toPercent(event.clientX, event.clientY);
     const next: Drag = { mode: 'create', origin: point, current: point };
     dragRef.current = next;
@@ -250,11 +402,8 @@ export function BoothMapPage() {
   // --- 키보드 미세 조정 -------------------------------------------------------
 
   function nudge(booth: Booth, dx: number, dy: number) {
-    const rect = clampRectInside({
-      ...toRect(booth.position, booth.size, defaultSize),
-      left: toRect(booth.position, booth.size, defaultSize).left + dx,
-      top: toRect(booth.position, booth.size, defaultSize).top + dy,
-    });
+    const base = toRect(booth.position, booth.size, defaultSize);
+    const rect = clampRectInside({ ...base, left: base.left + dx, top: base.top + dy });
     const geometry = fromRect(rect, minSize);
     // 화면은 먼저 움직이고, 연속 입력이 끝난 뒤 한 번만 저장한다.
     setBooths((current) => (current ?? []).map((item) => (item.id === booth.id ? { ...item, ...geometry } : item)));
@@ -264,7 +413,32 @@ export function BoothMapPage() {
     }, 500);
   }
 
-  function handleBoothKeyDown(event: React.KeyboardEvent, booth: Booth) {
+  function nudgeRoom(room: FloorRoom, dx: number, dy: number) {
+    if (!plan) return;
+    const base = roomToRect(room);
+    const rect = clampRectInside({ ...base, left: base.left + dx, top: base.top + dy });
+    const geometry = rectToRoom(rect, minRoomSize);
+    const moved = { ...room, ...geometry };
+    setPlans((current) =>
+      current
+        ? {
+            ...current,
+            floors: current.floors.map((item) =>
+              item.id === plan.id
+                ? { ...item, rooms: item.rooms.map((one) => (one.id === room.id ? moved : one)) }
+                : item,
+            ),
+          }
+        : current,
+    );
+    if (nudgeTimer.current) window.clearTimeout(nudgeTimer.current);
+    nudgeTimer.current = window.setTimeout(() => {
+      persistRoomGeometry(room.id, rect);
+    }, 500);
+  }
+
+  /** 방향키 한 번에 0.5%, Shift 를 누르면 2% 씩 움직인다. */
+  function arrowStep(event: React.KeyboardEvent): [number, number] | null {
     const step = event.shiftKey ? 2 : 0.5;
     const moves: Record<string, [number, number]> = {
       ArrowLeft: [-step, 0],
@@ -272,10 +446,28 @@ export function BoothMapPage() {
       ArrowUp: [0, -step],
       ArrowDown: [0, step],
     };
-    const move = moves[event.key];
+    return moves[event.key] ?? null;
+  }
+
+  function handleBoothKeyDown(event: React.KeyboardEvent, booth: Booth) {
+    const move = arrowStep(event);
     if (!move) return;
     event.preventDefault();
     nudge(booth, move[0], move[1]);
+  }
+
+  function handleRoomKeyDown(event: React.KeyboardEvent, room: FloorRoom) {
+    const move = arrowStep(event);
+    if (!move) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        setSelectedRoomId(room.id);
+      }
+      return;
+    }
+    event.preventDefault();
+    setSelectedRoomId(room.id);
+    nudgeRoom(room, move[0], move[1]);
   }
 
   // --- 새 부스 저장 -----------------------------------------------------------
@@ -339,6 +531,50 @@ export function BoothMapPage() {
     }
   }
 
+  // --- 교실 칸 편집 -----------------------------------------------------------
+
+  function updateRoom(id: string, patch: Partial<FloorRoom>) {
+    if (!plan) return;
+    void savePlan({ ...plan, rooms: plan.rooms.map((room) => (room.id === id ? { ...room, ...patch } : room)) });
+  }
+
+  function addRoom() {
+    if (!plan || plan.rooms.length >= maxRooms) return;
+    // 가운데에 기본 크기로 놓고 바로 선택한다 — 위치는 끌어서 옮기면 된다.
+    const room: FloorRoom = { id: newRoomId(plan.id), label: '새 칸', tone: 'room', x: 40, y: 40, w: 16, h: 16 };
+    setSelectedRoomId(room.id);
+    void savePlan({ ...plan, rooms: [...plan.rooms, room] });
+  }
+
+  function deleteRoom() {
+    if (!plan || !confirmRoomDelete) return;
+    const target = confirmRoomDelete;
+    setConfirmRoomDelete(null);
+    setSelectedRoomId(null);
+    void savePlan({ ...plan, rooms: plan.rooms.filter((room) => room.id !== target.id) });
+  }
+
+  async function resetFloor() {
+    if (!plan) return;
+    setBusy(true);
+    setSave({ kind: 'saving' });
+    try {
+      const restored = await api.resetFloorPlan(plan.id);
+      setPlans((current) =>
+        current
+          ? { ...current, floors: current.floors.map((item) => (item.id === restored.id ? restored : item)) }
+          : current,
+      );
+      setSelectedRoomId(null);
+      setSave({ kind: 'saved', at: Date.now() });
+    } catch (cause) {
+      setSave({ kind: 'error', message: cause instanceof ApiError ? cause.message : '되돌리지 못했습니다.' });
+    } finally {
+      setConfirmReset(false);
+      setBusy(false);
+    }
+  }
+
   // --- 렌더 -------------------------------------------------------------------
 
   const createPreview =
@@ -352,15 +588,53 @@ export function BoothMapPage() {
       : newBooth?.rect ?? null;
 
   function rectFor(booth: Booth): Rect {
-    if (draftRect && drag && drag.mode !== 'create' && drag.id === booth.id) return draftRect;
+    if (draftRect && drag && drag.mode !== 'create' && drag.target === 'booth' && drag.id === booth.id) {
+      return draftRect;
+    }
     return toRect(booth.position, booth.size, defaultSize);
   }
+
+  const roomInteraction: RoomInteraction = {
+    selectedId: selectedRoomId,
+    rectFor: (room) =>
+      draftRect && drag && drag.mode !== 'create' && drag.target === 'room' && drag.id === room.id
+        ? draftRect
+        : roomToRect(room),
+    onPointerDown: startRoomMove,
+    onKeyDown: handleRoomKeyDown,
+    onResizeStart: startRoomResize,
+  };
 
   return (
     <>
       <div className="page-head">
         <h1>부스 배치도</h1>
         <div className="actions-row">
+          <div className="floor-switch" role="group" aria-label="편집 대상">
+            <button
+              type="button"
+              className="floor-switch-tab"
+              aria-pressed={mode === 'booth'}
+              onClick={() => {
+                setMode('booth');
+                setSelectedRoomId(null);
+              }}
+            >
+              부스 편집
+            </button>
+            <button
+              type="button"
+              className="floor-switch-tab"
+              aria-pressed={mode === 'room'}
+              onClick={() => {
+                setMode('room');
+                setSelectedId(null);
+                setNewBooth(null);
+              }}
+            >
+              교실 편집
+            </button>
+          </div>
           <div className="floor-switch" role="group" aria-label="층 선택">
             {(plans?.floors ?? []).map((item) => (
               <button
@@ -371,6 +645,7 @@ export function BoothMapPage() {
                 onClick={() => {
                   setFloor(item.id);
                   setSelectedId(null);
+                  setSelectedRoomId(null);
                   setNewBooth(null);
                 }}
               >
@@ -391,11 +666,20 @@ export function BoothMapPage() {
         </div>
       </div>
 
-      <p className="page-lede">
-        지도 위 <b>빈 공간을 드래그</b>하면 새 부스 영역이 만들어지고, <b>부스를 끌면</b> 위치가,{' '}
-        <b>모서리를 잡으면</b> 크기가 바뀝니다. 좌표는 배치도 대비 비율로 저장되어 공개 화면의 PC·모바일에서 같은
-        위치에 표시됩니다.
-      </p>
+      {mode === 'booth' ? (
+        <p className="page-lede">
+          지도 위 <b>빈 공간을 드래그</b>하면 새 부스 영역이 만들어지고, <b>부스를 끌면</b> 위치가,{' '}
+          <b>모서리를 잡으면</b> 크기가 바뀝니다. 좌표는 배치도 대비 비율로 저장되어 공개 화면의 PC·모바일에서 같은
+          위치에 표시됩니다.
+        </p>
+      ) : (
+        <p className="page-lede">
+          <b>교실 편집 모드</b> — 칸을 누르면 오른쪽에서 이름을 고치고, <b>칸을 끌면</b> 위치가,{' '}
+          <b>모서리를 잡으면</b> 크기가 바뀝니다. 새 칸은 오른쪽 <b>칸 추가</b> 버튼(또는 빈 공간 드래그)으로 만들고,
+          안 쓰는 칸은 선택 후 삭제하세요. 여기서 바꾼 교실 이름과 배치는 공개 화면에 그대로 반영됩니다. 부스는
+          흐리게만 보이고 움직이지 않습니다.
+        </p>
+      )}
 
       {error ? (
         <div className="error-banner" role="alert">
@@ -419,29 +703,34 @@ export function BoothMapPage() {
               ref={canvasRef}
               plan={plan}
               aspect={plans.aspect}
-              className={drag?.mode === 'create' ? 'is-drawing' : ''}
+              className={`${drag?.mode === 'create' ? 'is-drawing' : ''}${mode === 'room' ? ' is-room-mode' : ''}`}
               onPointerDown={startCreate}
+              rooms={mode === 'room' ? roomInteraction : undefined}
             >
               {floorBooths.map((booth, index) => {
                 const rect = rectFor(booth);
-                const isSelected = booth.id === selectedId;
+                const isSelected = mode === 'booth' && booth.id === selectedId;
+                const passive = mode === 'room';
                 return (
                   <div
                     key={booth.id}
-                    className={`fp-booth${isSelected ? ' is-selected' : ''}${booth.isPublic ? '' : ' is-private'}`}
+                    className={`fp-booth${isSelected ? ' is-selected' : ''}${booth.isPublic ? '' : ' is-private'}${
+                      passive ? ' is-passive' : ''
+                    }`}
                     style={{
                       left: `${rect.left}%`,
                       top: `${rect.top}%`,
                       width: `${rect.width}%`,
                       height: `${rect.height}%`,
                     }}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={isSelected}
-                    aria-label={`${booth.name} — 끌어서 이동, 방향키로 미세 조정`}
-                    onPointerDown={(event) => startMove(event, booth)}
-                    onKeyDown={(event) => handleBoothKeyDown(event, booth)}
-                    onFocus={() => setSelectedId(booth.id)}
+                    role={passive ? undefined : 'button'}
+                    tabIndex={passive ? undefined : 0}
+                    aria-pressed={passive ? undefined : isSelected}
+                    aria-hidden={passive ? true : undefined}
+                    aria-label={passive ? undefined : `${booth.name} — 끌어서 이동, 방향키로 미세 조정`}
+                    onPointerDown={passive ? undefined : (event) => startMove(event, booth)}
+                    onKeyDown={passive ? undefined : (event) => handleBoothKeyDown(event, booth)}
+                    onFocus={passive ? undefined : () => setSelectedId(booth.id)}
                   >
                     <span className="fp-booth-index">{index + 1}</span>
                     <span className="fp-booth-name">{booth.name}</span>
@@ -475,12 +764,27 @@ export function BoothMapPage() {
             </FloorPlanCanvas>
 
             <p className="fp-hint">
-              선택한 부스는 방향키로 0.5%씩(Shift +2%) 옮길 수 있습니다. 부스는 배치도 밖으로 나가지 않습니다.
+              {mode === 'booth'
+                ? '선택한 부스는 방향키로 0.5%씩(Shift +2%) 옮길 수 있습니다. 부스는 배치도 밖으로 나가지 않습니다.'
+                : '선택한 칸은 방향키로 0.5%씩(Shift +2%) 옮길 수 있습니다. 칸을 지워도 그 자리의 부스는 그대로 남습니다.'}
             </p>
           </div>
 
           <aside className="map-editor-panel">
-            {newBooth ? (
+            {mode === 'room' ? (
+              <RoomPanel
+                plan={plan}
+                selected={selectedRoom}
+                tones={roomTones}
+                maxRooms={maxRooms}
+                busy={busy}
+                onUpdateRoom={updateRoom}
+                onDeleteRoom={setConfirmRoomDelete}
+                onAddRoom={addRoom}
+                onUpdatePlan={(patch) => void savePlan({ ...plan, ...patch })}
+                onReset={() => setConfirmReset(true)}
+              />
+            ) : newBooth ? (
               <form
                 className="card"
                 onSubmit={(event) => {
@@ -693,6 +997,38 @@ export function BoothMapPage() {
         busy={busy}
         onConfirm={() => void archiveSelected()}
         onCancel={() => setConfirmArchive(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmRoomDelete !== null}
+        title="이 칸을 지울까요?"
+        description={
+          <>
+            <b>{confirmRoomDelete?.label}</b> ({confirmRoomDelete ? toneLabel(confirmRoomDelete.tone) : ''}) 칸이 공개
+            배치도에서 사라집니다. 그 자리에 있는 부스는 지워지지 않습니다.
+          </>
+        }
+        confirmLabel="칸 삭제"
+        danger
+        busy={busy}
+        onConfirm={deleteRoom}
+        onCancel={() => setConfirmRoomDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="이 층을 기본 배치도로 되돌릴까요?"
+        description={
+          <>
+            {plan?.label}에서 바꾼 칸 이름·위치·추가·삭제가 모두 사라지고 처음 배치로 돌아갑니다. 부스는 그대로
+            남습니다.
+          </>
+        }
+        confirmLabel="되돌리기"
+        danger
+        busy={busy}
+        onConfirm={() => void resetFloor()}
+        onCancel={() => setConfirmReset(false)}
       />
     </>
   );
