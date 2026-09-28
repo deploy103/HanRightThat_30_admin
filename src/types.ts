@@ -3,7 +3,7 @@
  * 두 저장소는 파일을 공유하지 않으므로(오직 HTTP API 로만 연결) 타입을 각자 유지한다.
  */
 
-export type FloorId = 2 | 3 | 4;
+export type FloorId = 1 | 2 | 3 | 4;
 
 export interface BoothPosition {
   /** 배치도 대비 % (부스 영역의 중심) */
