@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { Show, ShowInput } from '../types';
 
-const EMPTY_FORM: ShowInput = { time: '13:00', team: '', title: '', songTitle: '', genre: '', note: '' };
+const EMPTY_FORM: ShowInput = { time: '13:00', team: '', title: '', songTitles: [], genre: '', note: '' };
 
 export function PerformancesPage() {
   const [shows, setShows] = useState<Show[] | null>(null);
@@ -35,7 +35,7 @@ export function PerformancesPage() {
       time: show.time,
       team: show.team,
       title: show.title,
-      songTitle: show.songTitle ?? '',
+      songTitles: show.songTitles ?? [],
       genre: show.genre ?? '',
       note: show.note ?? '',
     });
@@ -124,16 +124,6 @@ export function PerformancesPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="show-song">곡명 (선택)</label>
-              <input
-                id="show-song"
-                value={form.songTitle ?? ''}
-                onChange={(event) => setForm((f) => ({ ...f, songTitle: event.target.value }))}
-                placeholder="예: 나는 반딧불"
-                maxLength={80}
-              />
-            </div>
-            <div className="field">
               <label htmlFor="show-genre">장르</label>
               <input
                 id="show-genre"
@@ -149,6 +139,18 @@ export function PerformancesPage() {
                 onChange={(event) => setForm((f) => ({ ...f, note: event.target.value }))}
               />
             </div>
+          </div>
+          <div className="field" style={{ marginBottom: 14 }}>
+            <label htmlFor="show-songs">곡명 (선택)</label>
+            {/* 한 줄 = 한 곡. 빈 줄은 서버가 버리므로 입력 중인 줄바꿈을 그대로 둔다. */}
+            <textarea
+              id="show-songs"
+              rows={3}
+              value={(form.songTitles ?? []).join('\n')}
+              onChange={(event) => setForm((f) => ({ ...f, songTitles: event.target.value.split('\n') }))}
+              placeholder={'예: 나는 반딧불\n사건의 지평선'}
+            />
+            <p className="field-hint">한 줄에 한 곡씩 적어 주세요 (최대 10곡). 비워 두어도 저장됩니다.</p>
           </div>
           <div className="actions-row">
             <button type="submit" className="btn btn-primary">
@@ -185,7 +187,7 @@ export function PerformancesPage() {
                 <td data-label="시간">{show.time}</td>
                 <td data-label="팀">{show.team}</td>
                 <td data-label="공연명">{show.title}</td>
-                <td data-label="곡명">{show.songTitle ?? '-'}</td>
+                <td data-label="곡명">{show.songTitles?.length ? show.songTitles.join(' · ') : '-'}</td>
                 <td data-label="장르">{show.genre ?? '-'}</td>
                 <td data-label="관리">
                   <div className="actions-row">
