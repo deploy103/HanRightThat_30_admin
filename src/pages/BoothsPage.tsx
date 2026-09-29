@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { AmountInput } from '../components/AmountInput';
 import { BoothImageField } from '../components/BoothImageField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { API_URL, api, ApiError } from '../lib/api';
@@ -178,13 +179,7 @@ export function BoothsPage() {
             </div>
             <div className="field">
               <label htmlFor="booth-amount">모금액</label>
-              <input
-                id="booth-amount"
-                type="number"
-                min={0}
-                value={form.amount}
-                onChange={(event) => setForm((f) => ({ ...f, amount: Number(event.target.value) }))}
-              />
+              <AmountInput id="booth-amount" value={form.amount} onChange={(amount) => setForm((f) => ({ ...f, amount }))} />
             </div>
             <div className="field">
               <label htmlFor="booth-place">위치 설명</label>

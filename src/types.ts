@@ -43,6 +43,7 @@ export interface Show {
   time: string;
   team: string;
   title: string;
+  songTitle?: string;
   genre?: string;
   note?: string;
 }

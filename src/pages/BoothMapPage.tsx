@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { AmountInput } from '../components/AmountInput';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { FloorPlanCanvas, type RoomInteraction } from '../components/FloorPlanCanvas';
 import { RoomPanel, toneLabel } from '../components/RoomPanel';
@@ -826,12 +827,10 @@ export function BoothMapPage() {
                 </div>
                 <div className="field">
                   <label htmlFor="new-amount">모금액</label>
-                  <input
+                  <AmountInput
                     id="new-amount"
-                    type="number"
-                    min={0}
                     value={newBooth.amount}
-                    onChange={(event) => setNewBooth({ ...newBooth, amount: Number(event.target.value) })}
+                    onChange={(amount) => setNewBooth({ ...newBooth, amount })}
                   />
                 </div>
                 <div className="field-checkbox" style={{ marginTop: 10 }}>

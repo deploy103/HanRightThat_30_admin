@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { Show, ShowInput } from '../types';
 
-const EMPTY_FORM: ShowInput = { time: '13:00', team: '', title: '', genre: '', note: '' };
+const EMPTY_FORM: ShowInput = { time: '13:00', team: '', title: '', songTitle: '', genre: '', note: '' };
 
 export function PerformancesPage() {
   const [shows, setShows] = useState<Show[] | null>(null);
@@ -31,7 +31,14 @@ export function PerformancesPage() {
 
   function startEdit(show: Show) {
     setEditingId(show.id);
-    setForm({ time: show.time, team: show.team, title: show.title, genre: show.genre ?? '', note: show.note ?? '' });
+    setForm({
+      time: show.time,
+      team: show.team,
+      title: show.title,
+      songTitle: show.songTitle ?? '',
+      genre: show.genre ?? '',
+      note: show.note ?? '',
+    });
     setShowForm(true);
   }
 
@@ -117,6 +124,16 @@ export function PerformancesPage() {
               />
             </div>
             <div className="field">
+              <label htmlFor="show-song">곡명 (선택)</label>
+              <input
+                id="show-song"
+                value={form.songTitle ?? ''}
+                onChange={(event) => setForm((f) => ({ ...f, songTitle: event.target.value }))}
+                placeholder="예: 나는 반딧불"
+                maxLength={80}
+              />
+            </div>
+            <div className="field">
               <label htmlFor="show-genre">장르</label>
               <input
                 id="show-genre"
@@ -156,6 +173,7 @@ export function PerformancesPage() {
               <th>시간</th>
               <th>팀</th>
               <th>공연명</th>
+              <th>곡명</th>
               <th>장르</th>
               <th>관리</th>
             </tr>
@@ -167,6 +185,7 @@ export function PerformancesPage() {
                 <td data-label="시간">{show.time}</td>
                 <td data-label="팀">{show.team}</td>
                 <td data-label="공연명">{show.title}</td>
+                <td data-label="곡명">{show.songTitle ?? '-'}</td>
                 <td data-label="장르">{show.genre ?? '-'}</td>
                 <td data-label="관리">
                   <div className="actions-row">
