@@ -115,7 +115,7 @@ export function PerformancesPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="show-title">공연명</label>
+              <label htmlFor="show-title">공연 내용</label>
               <input
                 id="show-title"
                 value={form.title}
@@ -174,7 +174,7 @@ export function PerformancesPage() {
               <th>순서</th>
               <th>시간</th>
               <th>팀</th>
-              <th>공연명</th>
+              <th>공연 내용</th>
               <th>곡명</th>
               <th>장르</th>
               <th>관리</th>
@@ -186,7 +186,7 @@ export function PerformancesPage() {
                 <td data-label="순서">{String(show.order).padStart(2, '0')}</td>
                 <td data-label="시간">{show.time}</td>
                 <td data-label="팀">{show.team}</td>
-                <td data-label="공연명">{show.title}</td>
+                <td data-label="공연 내용">{show.title}</td>
                 <td data-label="곡명">{show.songTitles?.length ? show.songTitles.join(' · ') : '-'}</td>
                 <td data-label="장르">{show.genre ?? '-'}</td>
                 <td data-label="관리">
