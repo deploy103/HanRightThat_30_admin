@@ -19,7 +19,7 @@ hanwol.site/api/admin/*  (HanRightThat_30 저장소가 서빙)
 
 - 로그인/로그아웃 (세션 쿠키 + **TOTP 2단계 인증** — 아래 "2단계 인증" 참고)
 - **소개 페이지(`/landing`)**: 축제 소개 문구·일정·이용 안내·FAQ 편집, 초안 저장/미리보기/게시 분리
-  (HANWOL-INTRO-V1 계약, 공개 저장소 요구사항2.md와 동일). 대시보드에 게시 여부·마지막 게시 시각 표시.
+  (HANWOL-INTRO-V1 계약). 대시보드에 게시 여부·마지막 게시 시각 표시.
 - 부스: 목록/추가/수정/보관(soft delete)/복원, 활성·공개 토글, 층/금액 입력, 소개 페이지용
   한 줄 소개/상세 설명, **대표 이미지 업로드**(미리보기·변경·삭제), "공개 위치 보기" 링크
 - **부스 배치도(`/booth-map`)**: 학교 지도 위에서 마우스로 끌어 부스를 만들고, 옮기고, 크기를 바꾸는
@@ -65,7 +65,7 @@ docker compose exec web node dist-server/server/createAdmin.js --username admin
 ```
 
 **주의**: `HanRightThat_30` 서버가 이미 실행 중일 때 이 CLI를 함께 돌리면, 서버 프로세스가 들고 있는
-캐시가 CLI가 방금 쓴 계정을 덮어써 조용히 유실될 수 있다(`HanRightThat_30/SECURITY_REVIEW.md` §3.1).
+캐시가 CLI가 방금 쓴 계정을 덮어써 조용히 유실될 수 있다.
 서버를 멈추고 실행하거나, 실행 직후 서버를 재시작한다.
 
 ## 환경변수
@@ -142,16 +142,16 @@ docker compose up -d --build
 
 ## 배포 / 업데이트
 
-권장 순서 (요구사항2.md §15):
+권장 순서:
 
 1. `HanRightThat_30` 데이터 백업(`data/festival.json`, `data/admin.json`).
 2. `HanRightThat_30` 서버를 새 버전(landing API/부스 선택 필드 포함)으로 먼저 배포한다.
    ```bash
-   cd /opt/hanwol/HanRightThat_30 && git pull && docker compose up -d --build
+   cd /path/to/HanRightThat_30 && git pull && docker compose up -d --build
    ```
 3. 이 저장소(관리자)를 새 버전으로 배포한다.
    ```bash
-   cd /opt/hanwol/HanRightThat_30_admin
+   cd /path/to/HanRightThat_30_admin
    git pull
    docker compose up -d --build
    ```
@@ -214,7 +214,7 @@ OTP 입력은 6칸 분리 입력이고 자동 포커스 이동·숫자만 입력
 **로그인 화면에는 초기화 기능이 없다.** 서버에 접근할 수 있는 운영자가 `HanRightThat_30` 쪽에서 CLI 로 실행한다.
 
 ```bash
-cd /opt/hanwol/HanRightThat_30
+cd /path/to/HanRightThat_30
 docker compose exec web node dist-server/server/resetTwoFactor.js --username admin
 docker compose restart web   # 캐시 반영을 위해 재시작
 ```
